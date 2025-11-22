@@ -240,6 +240,11 @@ class ParasailSTTEntity(SpeechToTextEntity):
         else:
             content_type = "application/octet-stream"
 
+        # Capture metadata values for use in executor
+        channels = metadata.channel
+        sample_width = metadata.bit_rate // 8  # 16 bit = 2 bytes
+        sample_rate = metadata.sample_rate
+
         _LOGGER.debug(
             "Transcribing audio: format=%s, language=%s, model=%s, size=%d bytes, content_type=%s",
             metadata.format,
@@ -252,10 +257,7 @@ class ParasailSTTEntity(SpeechToTextEntity):
         # Perform transcription
         def _transcribe():
             """Perform transcription in executor."""
-            # Create audio file object inside executor for thread safety
-            audio_file = io.BytesIO(audio_data)
-            audio_file.name = filename
-            audio_file.seek(0)
+            import wave
 
             # Debug: Log first few bytes to verify audio data
             _LOGGER.debug(
@@ -263,14 +265,54 @@ class ParasailSTTEntity(SpeechToTextEntity):
                 audio_data[:16].hex() if len(audio_data) >= 16 else audio_data.hex()
             )
 
+            # Check if data is raw PCM (doesn't start with RIFF header)
+            is_raw_pcm = not audio_data.startswith(b'RIFF')
+
+            if is_raw_pcm:
+                _LOGGER.debug("Audio data is raw PCM, creating WAV file with headers")
+                # Create proper WAV file from raw PCM data
+                wav_buffer = io.BytesIO()
+
+                with wave.open(wav_buffer, 'wb') as wav_file:
+                    # Set WAV parameters from metadata
+                    wav_file.setnchannels(channels)
+                    wav_file.setsampwidth(sample_width)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(audio_data)
+
+                wav_buffer.seek(0)
+                audio_file = wav_buffer
+
+                _LOGGER.debug(
+                    "Created WAV file: channels=%d, sample_width=%d, rate=%d, data_size=%d, wav_size=%d",
+                    channels,
+                    sample_width,
+                    sample_rate,
+                    len(audio_data),
+                    wav_buffer.getbuffer().nbytes
+                )
+            else:
+                _LOGGER.debug("Audio data already has WAV headers")
+                audio_file = io.BytesIO(audio_data)
+                audio_file.seek(0)
+
+            audio_file.name = filename
+
+            # Verify the file has proper WAV header
+            audio_file.seek(0)
+            first_bytes = audio_file.read(16)
+            audio_file.seek(0)
+            _LOGGER.debug("Final audio file first 16 bytes: %s", first_bytes.hex())
+
             client = OpenAI(
                 base_url=PARASAIL_API_BASE,
                 api_key=api_key,
             )
 
             # Build request parameters
-            _LOGGER.debug("Sending transcription request: model=%s, language=%s, file=%s, size=%d",
-                         model, language, filename, len(audio_data))
+            file_size = audio_file.getbuffer().nbytes
+            _LOGGER.debug("Sending transcription request: model=%s, file=%s, size=%d bytes",
+                         model, filename, file_size)
 
             # Make the API call - don't pass language parameter as it may cause issues with Parasail
             transcription = client.audio.transcriptions.create(
@@ -291,10 +333,9 @@ class ParasailSTTEntity(SpeechToTextEntity):
         except Exception as err:
             # Log detailed error information
             _LOGGER.error(
-                "Error during transcription: %s (format=%s, language=%s, model=%s, size=%d bytes)",
+                "Error during transcription: %s (format=%s, model=%s, size=%d bytes)",
                 err,
                 metadata.format,
-                language,
                 model,
                 len(audio_data),
                 exc_info=True
