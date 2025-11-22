@@ -1,0 +1,22 @@
+The PNG icon files have not been generated yet.
+
+To generate the required PNG files:
+
+1. Install ImageMagick or Inkscape:
+   - macOS: brew install imagemagick
+   - Ubuntu/Debian: sudo apt-get install imagemagick
+   - Arch: sudo pacman -S imagemagick
+
+2. Go to the brands_submission directory:
+   cd brands_submission
+
+3. Run the icon preparation script:
+   ./prepare_icons.sh
+
+4. The script will create:
+   - icon.png (256x256)
+   - icon@2x.png (512x512)
+   - logo.png (height 256px)
+   - logo@2x.png (height 512px)
+
+These files are required for submitting to the Home Assistant brands repository.
