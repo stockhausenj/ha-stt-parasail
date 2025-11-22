@@ -180,11 +180,12 @@ class ParasailSTTEntity(SpeechToTextEntity):
     def supported_sample_rates(self) -> list[AudioSampleRates]:
         """Return list of supported audio sample rates."""
         # Whisper can handle various sample rates
+        # Only use valid AudioSampleRates constants that exist in Home Assistant
         return [
             AudioSampleRates.SAMPLERATE_8000,
             AudioSampleRates.SAMPLERATE_16000,
-            AudioSampleRates.SAMPLERATE_22050,
-            AudioSampleRates.SAMPLERATE_44100,
+            AudioSampleRates.SAMPLERATE_22000,
+            AudioSampleRates.SAMPLERATE_44000,
             AudioSampleRates.SAMPLERATE_48000,
         ]
 
