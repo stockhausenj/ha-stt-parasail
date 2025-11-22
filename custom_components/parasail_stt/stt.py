@@ -182,10 +182,8 @@ class ParasailSTTEntity(SpeechToTextEntity):
         # Whisper can handle various sample rates
         return [
             AudioSampleRates.SAMPLERATE_8000,
-            AudioSampleRates.SAMPLERATE_11025,
             AudioSampleRates.SAMPLERATE_16000,
             AudioSampleRates.SAMPLERATE_22050,
-            AudioSampleRates.SAMPLERATE_32000,
             AudioSampleRates.SAMPLERATE_44100,
             AudioSampleRates.SAMPLERATE_48000,
         ]
