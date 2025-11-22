@@ -36,36 +36,31 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
             api_key=data[CONF_API_KEY],
         )
         # Create a minimal test audio file (silence)
-        # WAV header for 1 second of silence at 16kHz mono
+        # Simple WAV file: 0.1 second of silence at 16kHz mono, 16-bit PCM
         import struct
-        sample_rate = 16000
-        num_samples = sample_rate  # 1 second
-        audio_data = struct.pack('<H' * num_samples, *([0] * num_samples))
+        import wave
 
-        # WAV file header
-        wav_header = struct.pack(
-            '<4sI4s4sIHHIIHH4sI',
-            b'RIFF',
-            36 + len(audio_data),
-            b'WAVE',
-            b'fmt ',
-            16,  # fmt chunk size
-            1,   # PCM
-            1,   # channels
-            sample_rate,
-            sample_rate * 2,  # byte rate
-            2,   # block align
-            16,  # bits per sample
-            b'data',
-            len(audio_data)
-        )
+        # Create a minimal WAV file in memory
+        audio_buffer = io.BytesIO()
 
-        test_audio = io.BytesIO(wav_header + audio_data)
-        test_audio.name = "test.wav"
+        with wave.open(audio_buffer, 'wb') as wav_file:
+            # Set WAV file parameters
+            wav_file.setnchannels(1)  # mono
+            wav_file.setsampwidth(2)  # 16-bit = 2 bytes
+            wav_file.setframerate(16000)  # 16kHz
+
+            # Write 0.1 seconds of silence (1600 samples)
+            num_samples = 1600
+            silence = struct.pack('<' + 'h' * num_samples, *([0] * num_samples))
+            wav_file.writeframes(silence)
+
+        # Reset buffer position to beginning
+        audio_buffer.seek(0)
+        audio_buffer.name = "test.wav"
 
         return client.audio.transcriptions.create(
             model=data.get(CONF_MODEL, DEFAULT_MODEL),
-            file=test_audio,
+            file=audio_buffer,
         )
 
     try:
