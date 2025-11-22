@@ -268,21 +268,15 @@ class ParasailSTTEntity(SpeechToTextEntity):
                 api_key=api_key,
             )
 
-            # Build request parameters - pass file as tuple for proper multipart encoding
-            # Format: (filename, file_object, content_type)
-            params = {
-                "model": model,
-                "file": (filename, audio_file, content_type),
-            }
+            # Build request parameters
+            _LOGGER.debug("Sending transcription request: model=%s, language=%s, file=%s, size=%d",
+                         model, language, filename, len(audio_data))
 
-            # Only add language if specified
-            if language:
-                params["language"] = language
-
-            _LOGGER.debug("Sending transcription request with params: model=%s, language=%s, content_type=%s",
-                         model, language, content_type)
-
-            transcription = client.audio.transcriptions.create(**params)
+            # Make the API call - don't pass language parameter as it may cause issues with Parasail
+            transcription = client.audio.transcriptions.create(
+                model=model,
+                file=audio_file,
+            )
 
             return transcription.text
 
