@@ -235,7 +235,7 @@ class ParasailSTTEntity(SpeechToTextEntity):
             return transcription.text
 
         try:
-            text = await self._config_entry.hass.async_add_executor_job(_transcribe)
+            text = await self.hass.async_add_executor_job(_transcribe)
             _LOGGER.debug("Transcription result: %s", text)
 
             return SpeechResult(
