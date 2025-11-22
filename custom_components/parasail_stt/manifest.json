@@ -1,0 +1,13 @@
+{
+  "domain": "parasail_stt",
+  "name": "Parasail Speech-to-Text",
+  "codeowners": ["@stockhausenj"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/stockhausenj/ha-stt-parasail",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/stockhausenj/ha-stt-parasail/issues",
+  "requirements": ["openai>=1.40.0"],
+  "version": "1.0.0"
+}

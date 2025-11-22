@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Parasail Speech-to-Text",
+        "description": "Enter your Parasail API credentials and model preferences.",
+        "data": {
+          "api_key": "API Key",
+          "model": "Model"
+        },
+        "data_description": {
+          "api_key": "Your Parasail API key from https://www.parasail.io/",
+          "model": "The Whisper model to use for speech recognition"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key. Please check your credentials.",
+      "unknown": "An unexpected error occurred. Please try again."
+    },
+    "abort": {
+      "already_configured": "This integration is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Parasail Speech-to-Text",
+        "description": "Update your Parasail STT preferences.",
+        "data": {
+          "model": "Model"
+        },
+        "data_description": {
+          "model": "The Whisper model to use for speech recognition"
+        }
+      }
+    }
+  }
+}
