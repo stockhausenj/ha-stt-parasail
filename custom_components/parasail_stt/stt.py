@@ -161,27 +161,40 @@ class ParasailSTTEntity(SpeechToTextEntity):
     @property
     def supported_formats(self) -> list[AudioFormats]:
         """Return list of supported audio formats."""
+        # Whisper supports many formats, but we'll use the most common ones
         return [AudioFormats.WAV, AudioFormats.OGG]
 
     @property
     def supported_codecs(self) -> list[AudioCodecs]:
         """Return list of supported audio codecs."""
+        # Whisper is flexible with codecs
         return [AudioCodecs.PCM, AudioCodecs.OPUS]
 
     @property
     def supported_bit_rates(self) -> list[AudioBitRates]:
         """Return list of supported audio bit rates."""
-        return [AudioBitRates.BITRATE_16]
+        # Whisper can handle various bit rates
+        return [AudioBitRates.BITRATE_16, AudioBitRates.BITRATE_32]
 
     @property
     def supported_sample_rates(self) -> list[AudioSampleRates]:
         """Return list of supported audio sample rates."""
-        return [AudioSampleRates.SAMPLERATE_16000]
+        # Whisper can handle various sample rates
+        return [
+            AudioSampleRates.SAMPLERATE_8000,
+            AudioSampleRates.SAMPLERATE_11025,
+            AudioSampleRates.SAMPLERATE_16000,
+            AudioSampleRates.SAMPLERATE_22050,
+            AudioSampleRates.SAMPLERATE_32000,
+            AudioSampleRates.SAMPLERATE_44100,
+            AudioSampleRates.SAMPLERATE_48000,
+        ]
 
     @property
     def supported_channels(self) -> list[AudioChannels]:
         """Return list of supported audio channels."""
-        return [AudioChannels.CHANNEL_MONO]
+        # Whisper can handle both mono and stereo
+        return [AudioChannels.CHANNEL_MONO, AudioChannels.CHANNEL_STEREO]
 
     async def async_process_audio_stream(
         self, metadata: SpeechMetadata, stream: AsyncIterable[bytes]
@@ -207,30 +220,71 @@ class ParasailSTTEntity(SpeechToTextEntity):
                 result=SpeechResultState.ERROR,
             )
 
-        # Create audio file-like object
-        audio_file = io.BytesIO(audio_data)
-
-        # Set appropriate filename based on format
+        # Determine filename based on format
         if metadata.format == AudioFormats.WAV:
-            audio_file.name = "audio.wav"
+            filename = "audio.wav"
         elif metadata.format == AudioFormats.OGG:
-            audio_file.name = "audio.ogg"
+            filename = "audio.ogg"
         else:
-            audio_file.name = "audio.raw"
+            filename = "audio.raw"
+
+        # Prepare language parameter - only pass if it's a valid 2-letter code
+        language = None
+        if metadata.language and len(metadata.language) == 2:
+            language = metadata.language
+            _LOGGER.debug("Using language: %s", language)
+
+        # Determine content type based on format
+        if metadata.format == AudioFormats.WAV:
+            content_type = "audio/wav"
+        elif metadata.format == AudioFormats.OGG:
+            content_type = "audio/ogg"
+        else:
+            content_type = "application/octet-stream"
+
+        _LOGGER.debug(
+            "Transcribing audio: format=%s, language=%s, model=%s, size=%d bytes, content_type=%s",
+            metadata.format,
+            language,
+            model,
+            len(audio_data),
+            content_type
+        )
 
         # Perform transcription
         def _transcribe():
             """Perform transcription in executor."""
+            # Create audio file object inside executor for thread safety
+            audio_file = io.BytesIO(audio_data)
+            audio_file.name = filename
+            audio_file.seek(0)
+
+            # Debug: Log first few bytes to verify audio data
+            _LOGGER.debug(
+                "Audio file first 16 bytes: %s",
+                audio_data[:16].hex() if len(audio_data) >= 16 else audio_data.hex()
+            )
+
             client = OpenAI(
                 base_url=PARASAIL_API_BASE,
                 api_key=api_key,
             )
 
-            transcription = client.audio.transcriptions.create(
-                model=model,
-                file=audio_file,
-                language=metadata.language if metadata.language else None,
-            )
+            # Build request parameters - pass file as tuple for proper multipart encoding
+            # Format: (filename, file_object, content_type)
+            params = {
+                "model": model,
+                "file": (filename, audio_file, content_type),
+            }
+
+            # Only add language if specified
+            if language:
+                params["language"] = language
+
+            _LOGGER.debug("Sending transcription request with params: model=%s, language=%s, content_type=%s",
+                         model, language, content_type)
+
+            transcription = client.audio.transcriptions.create(**params)
 
             return transcription.text
 
@@ -243,7 +297,16 @@ class ParasailSTTEntity(SpeechToTextEntity):
                 result=SpeechResultState.SUCCESS,
             )
         except Exception as err:
-            _LOGGER.error("Error during transcription: %s", err, exc_info=True)
+            # Log detailed error information
+            _LOGGER.error(
+                "Error during transcription: %s (format=%s, language=%s, model=%s, size=%d bytes)",
+                err,
+                metadata.format,
+                language,
+                model,
+                len(audio_data),
+                exc_info=True
+            )
             return SpeechResult(
                 text="",
                 result=SpeechResultState.ERROR,
